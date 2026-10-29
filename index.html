@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6b4f">
+<title>Pitch Tap Chart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: a phone-first charting tool. Zone chart redrawn from the coach's paper sheet (black edge columns, dark middle cross, light corners, outside strips, 1-9 ruler).
+   Tap chart + result buttons on the left, running totals and the at-bat table on the right; one column on a phone. */
+:root {
+  --bg: #EEF2F0;
+  --surface: #FFFFFF;
+  --line: #CBD5CF;
+  --ink: #14231D;
+  --muted: #5B6B63;
+  --accent: #1F6B4A;
+  --accent-ink: #FFFFFF;
+  --z-out: #EDF0EE;
+  --z-light: #C9CFCB;
+  --z-dark: #8C9791;
+  --z-black: #1E2523;
+  --z-line: #6B7872;
+  --zt-out: #14231D;
+  --zt-light: #14231D;
+  --zt-dark: #14231D;
+  --zt-black: #FFFFFF;
+  --halo: #FFFFFF;
+  --r-foul: #A8650A;
+  --r-miss: #2A63AE;
+  --r-hard: #C4510A;
+  --note-bg: #FFF4D6;
+  --note-ink: #5A4300;
+  --warn: #B42318;
+  --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1713; --surface: #16231D; --line: #2B3C34; --ink: #E6EEE9; --muted: #98A89F; --accent: #4FB383; --accent-ink: #08140E;
+    --z-out: #18241E; --z-light: #2E3E36; --z-dark: #51675B; --z-black: #020403; --z-line: #6F8478;
+    --zt-out: #E6EEE9; --zt-light: #E6EEE9; --zt-dark: #E6EEE9; --zt-black: #E6EEE9; --halo: #0E1713;
+    --r-foul: #E2A83B; --r-miss: #7DB0EE; --r-hard: #F08A4B; --note-bg: #3A2F10; --note-ink: #F3DDA0; --warn: #F4877B; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1713; --surface: #16231D; --line: #2B3C34; --ink: #E6EEE9; --muted: #98A89F; --accent: #4FB383; --accent-ink: #08140E;
+  --z-out: #18241E; --z-light: #2E3E36; --z-dark: #51675B; --z-black: #020403; --z-line: #6F8478;
+  --zt-out: #E6EEE9; --zt-light: #E6EEE9; --zt-dark: #E6EEE9; --zt-black: #E6EEE9; --halo: #0E1713;
+  --r-foul: #E2A83B; --r-miss: #7DB0EE; --r-hard: #F08A4B; --note-bg: #3A2F10; --note-ink: #F3DDA0; --warn: #F4877B; color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.4;
+  padding-block: 16px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+[hidden] { display: none !important; }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; letter-spacing: .01em; margin: 0; line-height: 1.05; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 17px; letter-spacing: .06em; text-transform: uppercase; margin: 0; color: var(--muted); }
+h3 { font-family: var(--font-display); font-weight: 600; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 6px; color: var(--muted); }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 64ch; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; }
+.panel > * { min-width: 0; }
+.phead { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+.note { background: var(--note-bg); color: var(--note-ink); border-radius: 8px; padding: 10px 12px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.status { color: var(--muted); font-size: 13px; min-height: 18px; }
+.status.err { color: var(--warn); }
+label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 0; }
+input[type=text], input[type=date], input[type=number], select {
+  font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; min-width: 0; width: 100%; text-transform: none; letter-spacing: 0; font-weight: 500; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sess { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+.sess .f-hit { grid-column: span 2; }
+.sess .chk { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; color: var(--ink); }
+.sess .chk input { width: 20px; height: 20px; accent-color: var(--accent); }
+.btn { font: inherit; font-weight: 600; min-height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; touch-action: manipulation; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--warn); border-color: var(--warn); }
+.btn.sm { min-height: 34px; padding: 0 10px; font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 13px; font-weight: 600; min-height: 34px; padding: 0 10px; border: 0; border-right: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; touch-action: manipulation; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.strip { display: grid; gap: 8px; }
+.strip .top { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.strip .big { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1; }
+.strip .count { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.seq { display: flex; gap: 6px; flex-wrap: wrap; min-height: 30px; }
+.seq span { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; padding: 3px 8px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.seq i { font-style: normal; font-size: 15px; }
+.picker { border: 1px solid var(--accent); border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-weight: 600; min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; touch-action: manipulation; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.types { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 6px; }
+.types .chip { padding: 0 2px; display: grid; justify-items: center; align-content: center; line-height: 1.05; min-height: 50px; }
+.types .chip b { font-family: var(--font-display); font-size: 20px; }
+.types .chip small { font-size: 11px; font-weight: 600; opacity: .8; }
+.zonebox { display: flex; justify-content: center; }
+svg.zone { height: auto; display: block; touch-action: manipulation; border-radius: 6px; cursor: crosshair; }
+.zc { stroke: var(--z-line); stroke-width: .7; stroke-dasharray: 3 3; }
+.zt-O { fill: var(--z-out); } .zt-L { fill: var(--z-light); } .zt-D { fill: var(--z-dark); } .zt-N { fill: var(--z-black); }
+.zn { font: 600 10px var(--font-body); text-anchor: middle; }
+.zn.t-O { fill: var(--zt-out); } .zn.t-L { fill: var(--zt-light); } .zn.t-D { fill: var(--zt-dark); } .zn.t-N { fill: var(--zt-black); }
+.zl { font: 600 8.5px var(--font-body); fill: var(--muted); letter-spacing: .08em; text-anchor: middle; }
+.zo { fill: none; stroke: var(--ink); stroke-width: 1.6; }
+.mh { fill: none; stroke: var(--halo); stroke-width: 4.4; stroke-linejoin: round; }
+.ms { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.mt { fill: currentColor; font: 700 11px var(--font-body); paint-order: stroke; stroke: var(--halo); stroke-width: 3px; stroke-linejoin: round; }
+.mk { color: var(--ink); pointer-events: none; }
+.mk.r-Foul { color: var(--r-foul); } .mk.r-Miss { color: var(--r-miss); } .mk.r-Hard { color: var(--r-hard); }
+.pend { pointer-events: none; }
+.pend circle, .pend line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.pend .h { stroke: var(--halo); stroke-width: 5; }
+.pend circle.d { stroke-dasharray: 3 2.5; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.legend b { color: var(--ink); font-size: 16px; font-weight: 600; margin-right: 3px; }
+.hint { margin: 0; color: var(--muted); font-size: 14px; min-height: 20px; }
+.rg { display: grid; gap: 6px; }
+.res { display: grid; gap: 6px; }
+.res.c3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.res.c4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.rbtn { font: inherit; font-weight: 600; font-size: 13px; min-height: 58px; padding: 6px 4px; border-radius: 8px; border: 2px solid currentColor; background: var(--surface); cursor: pointer; display: grid; gap: 2px; justify-items: center; align-content: center; line-height: 1.1; touch-action: manipulation; }
+.rbtn .g { font-size: 20px; line-height: 1; }
+.rbtn:disabled { opacity: .35; cursor: not-allowed; }
+.rbtn:not(:disabled):active { background: var(--bg); }
+.r-Ball, .r-Strike, .r-HBP, .r-In { color: var(--ink); } .r-Foul { color: var(--r-foul); } .r-Miss { color: var(--r-miss); } .r-Hard { color: var(--r-hard); }
+.last { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 10px; min-height: 52px; }
+.last .what { flex: 1 1 180px; min-width: 0; font-weight: 600; }
+.last .what small { color: var(--muted); font-weight: 400; display: block; }
+.last label { flex: 0 0 120px; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.tile b { display: block; font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; font-size: 14px; }
+th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+td.n, th.n { text-align: right; }
+tfoot td { font-weight: 700; border-bottom: 0; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--z-line); margin-right: 6px; vertical-align: -1px; }
+.sw.D { background: var(--z-dark); } .sw.L { background: var(--z-light); } .sw.N { background: var(--z-black); } .sw.O { background: var(--z-out); }
+.tallies { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.tally { border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.tally b { display: block; font-family: var(--font-display); font-size: 24px; line-height: 1; }
+.tally span { font-size: 12px; color: var(--muted); line-height: 1.2; display: block; margin-top: 2px; }
+.small { font-size: 13px; color: var(--muted); margin: 0; }
+.log { list-style: none; margin: 0; padding: 0; }
+.log li { display: grid; grid-template-columns: 56px 56px minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.log .no { color: var(--muted); font-variant-numeric: tabular-nums; }
+.log .g { font-size: 17px; }
+.export textarea { width: 100%; min-height: 110px; font: 12px/1.35 ui-monospace, Menlo, monospace; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 860px) {
+  .cols { grid-template-columns: minmax(0,1fr); }
+  .sess { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .sess .f-hit { grid-column: 1 / -1; }
+  h1 { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Pitch Tap Chart</h1>
+    <p class="sub">Tap where the pitch crossed the plate, then tap what happened. Marks use the paper chart's symbols, and the zone shading matches your coach's sheet.</p>
+  </header>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <div class="note" id="banner" hidden></div>
+
+  <div class="cols">
+    <div class="col">
+      <section class="panel" aria-label="Session">
+        <div class="sess">
+          <label class="f-hit">Hitter<input type="text" id="hitter" list="hitters" autocomplete="off" placeholder="Name"><datalist id="hitters"></datalist></label>
+          <label>Setting<select id="setting"><option value="Live BP">Live BP</option><option value="Drill">Drill / tee / soft toss</option><option value="Scrimmage">Scrimmage</option><option value="Game">Game</option></select></label>
+          <label>Date<input type="date" id="date"></label>
+          <label class="f-hit">Pitcher<input type="text" id="pitcher" autocomplete="off" placeholder="Optional"></label>
+          <label class="chk"><input type="checkbox" id="ab" checked> Count balls and strikes (turn off for drills where each pitch stands alone)</label>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Chart a pitch">
+        <div id="strip" class="strip"></div>
+        <div>
+          <h3>1. Pitch type</h3>
+          <div class="types" id="types"></div>
+        </div>
+        <div class="phead">
+          <h2>2. Where it crossed the plate</h2>
+          <div class="seg" id="scope" role="group" aria-label="Which pitches to show">
+            <button type="button" data-s="ab" aria-pressed="false">This at-bat</button>
+            <button type="button" data-s="session" aria-pressed="true">This session</button>
+            <button type="button" data-s="all" aria-pressed="false">All sessions</button>
+          </div>
+        </div>
+        <div class="zonebox"><svg id="zone" class="zone" tabindex="0" role="group" aria-label="Strike zone chart. Tap to place a pitch. Arrow keys move the marker."></svg></div>
+        <p class="hint" id="hint" aria-live="polite"></p>
+        <div class="rg"><h3>3. What happened</h3>
+          <div class="res c3" id="resTake" role="group" aria-label="Took the pitch"></div>
+          <div class="res c4" id="resSwing" role="group" aria-label="Swung"></div>
+        </div>
+        <div class="legend" aria-label="Symbol key">
+          <span><b>1</b>pitch type, no swing</span><span><b>□</b>foul</span><span><b>△</b>swing and miss</span><span><b>○</b>in play</span><span><b>◎</b>hard contact</span>
+        </div>
+        <div class="last" id="last"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel" aria-label="Totals">
+        <div class="phead"><h2>Totals</h2><span class="small" id="statScope"></span></div>
+        <div id="stats"></div>
+      </section>
+      <section class="panel" aria-label="At-bats">
+        <div class="phead"><h2>At-bats</h2></div>
+        <div class="tbl" id="abs"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel" aria-label="Recent pitches">
+    <h2>Recent pitches</h2>
+    <ul class="log" id="log"></ul>
+  </section>
+
+  <section class="panel export" aria-label="Export">
+    <h2>Save or move your data</h2>
+    <p class="small">Pitches save automatically. To use them in the Excel sheet, copy the rows and paste them into a new tab; the first row is a header. You can also ask Claude to read your saved pitches and build the heat maps directly.</p>
+    <div class="row">
+      <button class="btn primary" id="copyS" type="button">Copy this session</button>
+      <button class="btn" id="copyA" type="button">Copy all saved pitches</button>
+      <button class="btn danger" id="delS" type="button">Delete this session</button>
+    </div>
+    <h2 style="margin-top:18px">Team Google Sheet</h2>
+    <p class="small">Connect once and every pitch you chart is also sent to your team's Google Sheet, where the Hitter Report reads it. Pitches always save on this device first, so charting works without signal and sends when you are back online.</p>
+    <div class="sess" style="margin-top:10px">
+      <label class="f-hit">Sheet link (the Web app URL from Apps Script)<input type="url" id="syncUrl" autocomplete="off" placeholder="https://script.google.com/macros/s/.../exec"></label>
+      <label>Team passcode<input type="password" id="syncKey" autocomplete="off"></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="syncSave" type="button">Save and test</button>
+      <button class="btn" id="syncAll" type="button">Send all saved pitches now</button>
+      <button class="btn" id="syncOff" type="button">Disconnect</button>
+    </div>
+    <p class="small" id="syncMsg" role="status" aria-live="polite" style="margin-top:8px"></p>
+    <textarea id="tsv" readonly hidden aria-label="Rows to copy"></textarea>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  /* ---------- constants ---------- */
+  var TYPES = [[1,'FB','Fastball'],[2,'SL','Slider'],[3,'CB','Curveball'],[4,'CH','Changeup'],[5,'CU','Cutter'],[6,'2S','Two-seam'],[7,'Other','Other']];
+  var RES = {
+    'Ball':         { l: 'Ball',            g: '·', cls: 'r-Ball',   take: 1 },
+    'Strike':       { l: 'Called strike',   g: '—', cls: 'r-Strike', take: 1 },
+    'HBP':          { l: 'Hit by pitch',    g: 'H',      cls: 'r-HBP',    take: 1 },
+    'Foul':         { l: 'Foul',            g: '□', cls: 'r-Foul' },
+    'Miss':         { l: 'Swing and miss',  g: '△', cls: 'r-Miss' },
+    'In play':      { l: 'In play',         g: '○', cls: 'r-In' },
+    'Hard contact': { l: 'Hard contact',    g: '◎', cls: 'r-Hard' }
+  };
+  var SW = { 'Foul': 1, 'Miss': 1, 'In play': 1, 'Hard contact': 1 };
+  var CONTACT = { 'In play': 1, 'Hard contact': 1 };
+  var OUTCOMES = ['Single','Double','Triple','Home run','Ground out','Line out','Fly out','Pop out','Error','Fielder’s choice','Sacrifice'];
+  var TIERN = { D: 'Dark (middle)', L: 'Light (edge)', N: 'Black (edge)', O: 'Outside' };
+  /* Zone geometry in SVG units: 9 columns (the 1-9 ruler) by 6 rows (outside high, upper, two middle rows, lower, outside low). */
+  var COLW = [20,34,34,42,42,42,34,34,20], ROWH = [34,110,34,34,110,34];
+  var MX = 26, MY = 6, GAP = 8, RH = 17, OW = 20; /* MX = left edge of columns 1-9; the outside columns sit in the margins */
+  var colX = [0], rowY = [0], i;
+  for (i = 0; i < 9; i++) colX.push(colX[i] + COLW[i]);
+  for (i = 0; i < 6; i++) rowY.push(rowY[i] + ROWH[i]);
+  var W = colX[9], H = rowY[6], RY = MY + H + GAP, VBW = W + 2 * MX, VBH = RY + 2 * RH + 4 + MY;
+  var HEAD = ['Date','Hitter','Setting','Pitcher','At-bat #','Pitch # in at-bat','Pitch type #','Pitch type','X (0-100 across columns 1-9; outside is below 0 or above 100)','Y (0-100, top to bottom)','Zone column (1-9; 0 = outside left, 10 = outside right)','Zone row (1-6, top to bottom)','Zone shade','Result','Exit velo (mph)','At-bat result','Quality at-bat (Y/N)'];
+
+  /* ---------- state ---------- */
+  var S = {}, DB = null, dirty = {}, inflight = {}, demoOn = false, demo = null, pend = null, lastMsg = '', statusTimer = 0;
+  var cur = { hitter: '', setting: 'Live BP', date: '', pitcher: '', ab: true, type: 1, scope: 'session' };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function r1(n) { return Math.round(n * 10) / 10; }
+  function pad(n) { return ('0' + n).slice(-2); }
+  function today() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'x'; }
+  function pct(a, b) { return b ? Math.round(100 * a / b) + '%' : '–'; }
+  function typeShort(n) { for (var k = 0; k < TYPES.length; k++) if (TYPES[k][0] === n) return TYPES[k][1]; return String(n); }
+  function setStatus(msg, err) { var el = $('status'); el.textContent = msg || ''; el.className = 'status' + (err ? ' err' : ''); }
+
+  /* ---------- zone logic ---------- */
+  function colTxt(c, short) { return c === 0 ? 'outside left' : c === 10 ? 'outside right' : (short ? 'col ' : 'column ') + c; }
+  function tierOf(c, r) {
+    if (r === 1 || r === 6 || c === 0 || c === 10) return 'O';
+    if (c === 1 || c === 9) return 'N';
+    if ((c >= 4 && c <= 6) || r === 3 || r === 4) return 'D';
+    return 'L';
+  }
+  function locate(vx, vy) {
+    var xd = Math.min(Math.max(vx - MX, -OW), W + OW - 0.01), yd = Math.min(Math.max(vy - MY, 0), H - 0.01), c = 1, r = 1;
+    if (xd < 0) c = 0; else if (xd >= W) c = 10; else while (c < 9 && xd >= colX[c]) c++;
+    while (r < 6 && yd >= rowY[r]) r++;
+    return { x: r1(xd / W * 100), y: r1(yd / H * 100), c: c, r: r, k: tierOf(c, r) };
+  }
+
+  /* ---------- at-bat logic ---------- */
+  function countOf(ps) {
+    var b = 0, s = 0;
+    ps.forEach(function (p) {
+      if (p.res === 'Ball') b++;
+      else if (p.res === 'Strike' || p.res === 'Miss') s++;
+      else if (p.res === 'Foul' && s < 2) s++;
+    });
+    return { b: b, s: s };
+  }
+  function openN(sess) { return sess.pas.length + 1; }
+  function openPitches(sess) { var n = openN(sess); return sess.pitches.filter(function (p) { return p.pa === n; }); }
+  function awaiting(sess) {
+    if (!sess.ab) return false;
+    var ps = openPitches(sess);
+    return ps.length > 0 && !!CONTACT[ps[ps.length - 1].res];
+  }
+  function closePA(sess, res, note) { sess.pas.push({ n: openN(sess), res: res, note: note || '', qab: false }); }
+  function autoClose(sess, p) {
+    var c = countOf(sess.pitches.filter(function (q) { return q.pa === p.pa; }));
+    if (p.res === 'HBP') closePA(sess, 'Hit by pitch');
+    else if (c.b >= 4) closePA(sess, 'Walk');
+    else if (c.s >= 3) closePA(sess, p.res === 'Miss' ? 'Strikeout swinging' : 'Strikeout looking');
+  }
+  function addPitch(sess, loc, type, res, pitcher) {
+    if (awaiting(sess)) closePA(sess, 'In play');
+    var n = sess.ab ? openN(sess) : 0;
+    var seq = sess.ab ? sess.pitches.filter(function (q) { return q.pa === n; }).length + 1 : 0;
+    var p = { t: type, x: loc.x, y: loc.y, c: loc.c, r: loc.r, k: loc.k, res: res, pa: n, i: seq, pc: pitcher || '', ts: Date.now() };
+    sess.pitches.push(p);
+    if (sess.ab) autoClose(sess, p);
+    return p;
+  }
+  function undoPitch(sess) {
+    var p = sess.pitches.pop();
+    if (!p) return;
+    if (p.pa) { for (var k = sess.pas.length - 1; k >= 0; k--) if (sess.pas[k].n === p.pa) { sess.pas.splice(k, 1); break; } }
+  }
+
+  /* ---------- saving ---------- */
+  function norm(v, id) {
+    return { id: id, hitter: v.hitter || '', date: v.date || '', setting: v.setting || '', ab: v.ab !== false,
+      pitches: Array.isArray(v.pitches) ? v.pitches : [], pas: Array.isArray(v.pas) ? v.pas : [] };
+  }
+  function body(s) { return { hitter: s.hitter, date: s.date, setting: s.setting, ab: s.ab, pitches: s.pitches, pas: s.pas }; }
+  function saveLocal() {
+    try { localStorage.setItem('ptc-local', JSON.stringify(S)); setStatus('Saved on this device only.'); }
+    catch (e) { setStatus('This browser would not save. Copy your rows before closing.', true); }
+  }
+  function flush(id) {
+    var s = S[id];
+    if (!s || !dirty[id]) { inflight[id] = false; return; }
+    dirty[id] = false; inflight[id] = true;
+    DB.doc('sessions/' + id).set(body(s)).then(function () {
+      setStatus('Saved ' + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()));
+    }, function (e) {
+      setStatus('Not saved (' + ((e && (e.code || e.message)) || 'error') + '). Keep this tab open and copy your rows.', true);
+    }).then(function () { inflight[id] = false; if (dirty[id]) flush(id); });
+  }
+  function persist(sess) {
+    if (!sess || sess === demo) return;
+    if (!DB) { saveLocal(); queueSync(sess.id, 'put'); return; }
+    dirty[sess.id] = true;
+    if (!inflight[sess.id]) flush(sess.id);
+  }
+  function loadPrefs() {
+    try {
+      var o = JSON.parse(localStorage.getItem('ptc-prefs') || '{}');
+      ['hitter', 'setting', 'pitcher', 'type', 'scope'].forEach(function (k) { if (o[k] != null) cur[k] = o[k]; });
+      if (typeof o.ab === 'boolean') cur.ab = o.ab;
+    } catch (e) {}
+  }
+  function savePrefs() {
+    if (demoOn) return;
+    try { localStorage.setItem('ptc-prefs', JSON.stringify({ hitter: cur.hitter, setting: cur.setting, pitcher: cur.pitcher, type: cur.type, scope: cur.scope, ab: cur.ab })); } catch (e) {}
+  }
+  function loadLocal() {
+    try { var o = JSON.parse(localStorage.getItem('ptc-local') || '{}'); Object.keys(o).forEach(function (k) { S[k] = norm(o[k], k); }); } catch (e) {}
+  }
+
+  /* ---------- session lookup ---------- */
+  function curKey() { var h = cur.hitter.trim(); return h ? cur.date + '_' + slug(h) + '_' + slug(cur.setting) : null; }
+  function curSession(create) {
+    var id = curKey();
+    if (!id) return null;
+    var s = S[id];
+    if (!s && create) s = S[id] = { id: id, hitter: cur.hitter.trim(), date: cur.date, setting: cur.setting, ab: cur.ab, pitches: [], pas: [] };
+    return s || null;
+  }
+  function view() { return demoOn ? demo : curSession(false); }
+  function sameHitter(a, b) { return a.trim().toLowerCase() === b.trim().toLowerCase(); }
+  function scopeList() {
+    var s = view();
+    if (demoOn) return s ? s.pitches.map(function (p) { return { p: p, id: 'demo' }; }) : [];
+    if (cur.scope === 'all') {
+      var out = [];
+      Object.keys(S).sort().forEach(function (id) { var x = S[id]; if (sameHitter(x.hitter, cur.hitter)) x.pitches.forEach(function (p) { out.push({ p: p, id: id }); }); });
+      return out;
+    }
+    if (!s) return [];
+    if (cur.scope === 'ab' && s.ab) {
+      var n = openN(s), ps = s.pitches.filter(function (p) { return p.pa === n; });
+      if (!ps.length && s.pas.length) { n = s.pas.length; ps = s.pitches.filter(function (p) { return p.pa === n; }); }
+      return ps.map(function (p) { return { p: p, id: s.id }; });
+    }
+    return s.pitches.map(function (p) { return { p: p, id: s.id }; });
+  }
+
+  /* ---------- stats ---------- */
+  function calc(ps) {
+    function z() { return { n: 0, sw: 0, miss: 0, hard: 0 }; }
+    var o = { n: ps.length, sw: 0, miss: 0, hard: 0, SS: 0, BS: 0, BT: 0, ST: 0, ev: [], tier: { D: z(), L: z(), N: z(), O: z() } };
+    ps.forEach(function (p) {
+      var sw = !!SW[p.res], ball = (p.k === 'N' || p.k === 'O'), t = o.tier[p.k];
+      t.n++;
+      if (sw) { o.sw++; t.sw++; }
+      if (p.res === 'Miss') { o.miss++; t.miss++; }
+      if (p.res === 'Hard contact') { o.hard++; t.hard++; }
+      if (sw) { if (ball) o.BS++; else o.SS++; }
+      else if (p.res !== 'HBP') { if (ball) o.BT++; else o.ST++; }
+      if (typeof p.ev === 'number') o.ev.push(p.ev);
+    });
+    return o;
+  }
+
+  /* ---------- drawing ---------- */
+  function buildStatic() {
+    var s = '', c, r, x, y;
+    for (r = 1; r <= 6; r++) for (c = 1; c <= 9; c++)
+      s += '<rect class="zc zt-' + tierOf(c, r) + '" x="' + (MX + colX[c - 1]) + '" y="' + (MY + rowY[r - 1]) + '" width="' + COLW[c - 1] + '" height="' + ROWH[r - 1] + '"/>';
+    s += '<rect class="zc zt-O" x="' + (MX - OW) + '" y="' + MY + '" width="' + OW + '" height="' + H + '"/>';
+    s += '<rect class="zc zt-O" x="' + (MX + W) + '" y="' + MY + '" width="' + OW + '" height="' + H + '"/>';
+    s += '<text class="zl" transform="translate(' + (MX - OW / 2 + 4) + ' ' + (MY + H / 2) + ') rotate(-90)" style="font-size:9px">OUTSIDE</text>';
+    s += '<text class="zl" transform="translate(' + (MX + W + OW / 2 + 4) + ' ' + (MY + H / 2) + ') rotate(90)" style="font-size:9px">OUTSIDE</text>';
+    s += '<rect class="zo" x="' + MX + '" y="' + (MY + rowY[1]) + '" width="' + W + '" height="' + (rowY[5] - rowY[1]) + '"/>';
+    s += '<text class="zl" x="' + (MX + W / 2) + '" y="' + (MY + 21) + '">OUTSIDE HIGH</text>';
+    s += '<text class="zl" x="' + (MX + W / 2) + '" y="' + (MY + rowY[5] + 21) + '">OUTSIDE LOW</text>';
+    for (c = 1; c <= 9; c++) {
+      var t = (c === 1 || c === 9) ? 'N' : (c >= 4 && c <= 6 ? 'D' : 'L');
+      x = MX + colX[c - 1];
+      s += '<rect class="zc zt-' + t + '" x="' + x + '" y="' + RY + '" width="' + COLW[c - 1] + '" height="' + RH + '"/>';
+      s += '<rect class="zc zt-' + t + '" x="' + x + '" y="' + (RY + RH + 2) + '" width="' + COLW[c - 1] + '" height="' + RH + '"/>';
+      s += '<text class="zn t-' + t + '" x="' + (x + COLW[c - 1] / 2) + '" y="' + (RY + 12.5) + '">' + (10 - c) + '</text>';
+      s += '<text class="zn t-' + t + '" x="' + (x + COLW[c - 1] / 2) + '" y="' + (RY + RH + 14.5) + '">' + c + '</text>';
+    }
+    s += '<text class="zl" x="' + (MX - 4) + '" y="' + (RY + RH + 14) + '" text-anchor="end" style="text-anchor:end">RHH</text>';
+    s += '<text class="zl" x="' + (MX + W + 4) + '" y="' + (RY + 12) + '" style="text-anchor:start">LHH</text>';
+    return s;
+  }
+  var STATIC = '';
+  function mark(p, dim) {
+    var vx = r1(MX + p.x / 100 * W), vy = r1(MY + p.y / 100 * H), halo = '', ink = '', rc = RES[p.res] ? RES[p.res].cls : 'r-Ball';
+    function both(tag, a) { halo += '<' + tag + ' ' + a + ' class="mh"/>'; ink += '<' + tag + ' ' + a + ' class="ms"/>'; }
+    if (p.res === 'Foul') both('rect', 'x="-8" y="-8" width="16" height="16"');
+    else if (p.res === 'Miss') both('polygon', 'points="0,-10 9.5,7 -9.5,7"');
+    else if (p.res === 'In play') both('circle', 'r="9"');
+    else if (p.res === 'Hard contact') { both('circle', 'r="10.5"'); both('circle', 'r="6.6"'); }
+    var ty = p.res === 'Miss' ? 4.6 : 3.9;
+    return '<g class="mk ' + rc + '" transform="translate(' + vx + ' ' + vy + ')"' + (dim ? ' opacity=".5"' : '') + '>' + halo + ink + '<text class="mt" y="' + ty + '" text-anchor="middle">' + p.t + '</text></g>';
+  }
+  function renderChart() {
+    var list = scopeList(), s = view(), out = '', start = Math.max(0, list.length - 600);
+    for (var k = start; k < list.length; k++) out += mark(list[k].p, cur.scope === 'all' && !demoOn && s && list[k].id !== s.id);
+    if (pend) {
+      var vx = MX + pend.x / 100 * W, vy = MY + pend.y / 100 * H;
+      out += '<g class="pend" transform="translate(' + r1(vx) + ' ' + r1(vy) + ')"><circle class="h" r="12"/><line class="h" x1="-18" y1="0" x2="-7" y2="0"/><line class="h" x1="7" y1="0" x2="18" y2="0"/><line class="h" x1="0" y1="-18" x2="0" y2="-7"/><line class="h" x1="0" y1="7" x2="0" y2="18"/>' +
+        '<circle class="d" r="12"/><line x1="-18" y1="0" x2="-7" y2="0"/><line x1="7" y1="0" x2="18" y2="0"/><line x1="0" y1="-18" x2="0" y2="-7"/><line x1="0" y1="7" x2="0" y2="18"/></g>';
+    }
+    $('zone').innerHTML = STATIC + out;
+  }
+  function renderTypes() {
+    var el = $('types'); el.innerHTML = '';
+    TYPES.forEach(function (t) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'chip';
+      b.setAttribute('aria-pressed', cur.type === t[0] ? 'true' : 'false');
+      b.setAttribute('aria-label', t[2]);
+      b.innerHTML = '<b>' + t[0] + '</b><small>' + t[1] + '</small>';
+      b.onclick = function () { cur.type = t[0]; savePrefs(); renderTypes(); };
+      el.appendChild(b);
+    });
+  }
+  function renderResults() {
+    var ok = !!pend && cur.hitter.trim() !== '';
+    function fill(id, keys) {
+      var el = $(id); el.innerHTML = '';
+      keys.forEach(function (k) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'rbtn ' + RES[k].cls; b.disabled = !ok;
+        b.innerHTML = '<span class="g">' + RES[k].g + '</span><span>' + RES[k].l + '</span>';
+        b.onclick = function () { logResult(k); };
+        el.appendChild(b);
+      });
+    }
+    fill('resTake', ['Ball', 'Strike', 'HBP']);
+    fill('resSwing', ['Foul', 'Miss', 'In play', 'Hard contact']);
+    var h = $('hint');
+    if (!cur.hitter.trim()) h.textContent = 'Enter the hitter’s name first.';
+    else if (pend) h.textContent = colTxt(pend.c) + ', row ' + pend.r + ' · ' + TIERN[pend.k] + '. Now tap what happened.';
+    else h.textContent = 'Tap the chart where the pitch crossed the plate.';
+  }
+  function renderStrip() {
+    var el = $('strip'), s = view();
+    if (s && !s.ab) { el.innerHTML = '<div class="muted">At-bat counting is off for this session. Every pitch is logged on its own.</div>'; return; }
+    var n = s ? openN(s) : 1, ps = s ? openPitches(s) : [], c = countOf(ps), html = '';
+    html += '<div class="top"><span class="big">At-bat ' + n + '</span><span class="count" aria-label="Count">' + c.b + '–' + Math.min(c.s, 2) + '</span><span class="muted">balls–strikes</span></div>';
+    if (lastMsg) html += '<div class="muted">' + esc(lastMsg) + '</div>';
+    html += '<div class="seq" aria-label="Pitches this at-bat">';
+    ps.forEach(function (p) { html += '<span>' + p.t + '<i>' + RES[p.res].g + '</i></span>'; });
+    if (!ps.length) html += '<span class="muted" style="border-style:dashed">No pitches yet</span>';
+    html += '</div>';
+    if (s && awaiting(s)) {
+      html += '<div class="picker"><b>How did the at-bat end?</b><div class="chips">';
+      OUTCOMES.forEach(function (o, k) { html += '<button type="button" class="chip" data-o="' + k + '">' + esc(o) + '</button>'; });
+      html += '</div><label>Scorebook note (optional)<input type="text" id="pnote" placeholder="e.g. F8 or 6-3" autocomplete="off"></label></div>';
+    } else if (ps.length) {
+      html += '<div class="row"><button type="button" class="btn sm" id="endAB">End at-bat early</button></div>';
+    }
+    el.innerHTML = html;
+  }
+  function renderLast() {
+    var el = $('last'), s = view(), p = s && s.pitches.length ? s.pitches[s.pitches.length - 1] : null;
+    if (!p) { el.innerHTML = '<span class="muted">Your last pitch will show here with Undo.</span>'; return; }
+    var html = '<div class="what">Last: #' + s.pitches.length + ' · ' + typeShort(p.t) + ' · ' + RES[p.res].l + '<small>' + colTxt(p.c) + ', row ' + p.r + ' · ' + TIERN[p.k] + '</small></div>';
+    if (CONTACT[p.res]) html += '<label>Exit velo (mph)<input type="number" id="ev" inputmode="numeric" min="30" max="125" placeholder="optional" value="' + (typeof p.ev === 'number' ? p.ev : '') + '"></label>';
+    html += '<button type="button" class="btn" id="undo">Undo last pitch</button>';
+    el.innerHTML = html;
+  }
+  function tile(v, l) { return '<div class="tile"><b>' + v + '</b><span>' + l + '</span></div>'; }
+  function renderStats() {
+    var list = scopeList().map(function (x) { return x.p; });
+    if (cur.scope === 'ab') { var s0 = view(); list = s0 ? s0.pitches : []; if (demoOn) list = s0.pitches; }
+    var o = calc(list), html = '';
+    $('statScope').textContent = demoOn ? 'Example data' : (cur.scope === 'all' ? 'All sessions for this hitter' : 'This session');
+    html += '<div class="tiles">' + tile(o.n, 'Pitches') + tile(o.sw, 'Swings') + tile(pct(o.sw, o.n), 'Swing rate') +
+      tile(pct(o.miss, o.sw), 'Misses per swing') + tile(pct(o.hard, o.sw), 'Hard per swing') + tile(pct(o.BS, o.BS + o.BT), 'Chase rate') + '</div>';
+    html += '<h3 style="margin-top:14px">Swing decisions</h3><div class="tallies">' +
+      '<div class="tally"><b>' + o.SS + '</b><span>SS: swung at a pitch in the dark or light zone</span></div>' +
+      '<div class="tally"><b>' + o.BS + '</b><span>BS: swung at a black-edge or outside pitch</span></div>' +
+      '<div class="tally"><b>' + o.BT + '</b><span>BT: took a black-edge or outside pitch</span></div>' +
+      '<div class="tally"><b>' + o.ST + '</b><span>ST: took a pitch in the dark or light zone</span></div></div>';
+    html += '<h3 style="margin-top:14px">By zone shade</h3><div class="tbl"><table><thead><tr><th>Zone</th><th class="n">Pitches</th><th class="n">Swings</th><th class="n">Swing %</th><th class="n">Misses</th><th class="n">Hard</th></tr></thead><tbody>';
+    ['D', 'L', 'N', 'O'].forEach(function (k) {
+      var t = o.tier[k];
+      html += '<tr><td><span class="sw ' + k + '"></span>' + TIERN[k] + '</td><td class="n">' + t.n + '</td><td class="n">' + t.sw + '</td><td class="n">' + pct(t.sw, t.n) + '</td><td class="n">' + t.miss + '</td><td class="n">' + t.hard + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    var avg = o.ev.length ? (o.ev.reduce(function (a, b) { return a + b; }, 0) / o.ev.length).toFixed(1) : '–';
+    html += '<p class="small" style="margin-top:10px">Exit velo logged on ' + o.ev.length + ' balls in play · average ' + avg + ' mph · ' + o.ev.filter(function (v) { return v >= 85; }).length + ' at 85+ mph.</p>';
+    html += '<p class="small">Chase rate = BS ÷ (BS + BT). Black-edge and outside count as balls for these tallies.</p>';
+    $('stats').innerHTML = html;
+  }
+  function renderAtBats() {
+    var el = $('abs'), s = view();
+    if (!s || !s.ab || (!s.pas.length && !s.pitches.length)) { el.innerHTML = '<p class="small">At-bats appear here as they finish: pitcher, result, pitch count, exit velo, QAB, 85+ mph and 6+ pitch flags, like the paper chart.</p>'; return; }
+    var rows = '', evs = [], qab = 0, e85 = 0, s6 = 0;
+    s.pas.forEach(function (a) {
+      var ps = s.pitches.filter(function (p) { return p.pa === a.n; }), ev = null;
+      ps.forEach(function (p) { if (typeof p.ev === 'number') ev = p.ev; });
+      if (ev !== null) evs.push(ev);
+      var is85 = ev !== null && ev >= 85, is6 = ps.length >= 6;
+      if (a.qab) qab++; if (is85) e85++; if (is6) s6++;
+      rows += '<tr><td class="n">' + a.n + '</td><td>' + esc(ps[0] && ps[0].pc ? ps[0].pc : '') + '</td><td>' + esc(a.res) + (a.note ? ' <span class="muted">(' + esc(a.note) + ')</span>' : '') + '</td><td class="n">' + ps.length + '</td><td class="n">' + (ev === null ? '' : ev) + '</td>' +
+        '<td><input type="checkbox" data-q="' + a.n + '" aria-label="Quality at-bat ' + a.n + '"' + (a.qab ? ' checked' : '') + '></td><td>' + (is85 ? 'Y' : (ev === null ? '' : 'N')) + '</td><td>' + (is6 ? 'Y' : 'N') + '</td></tr>';
+    });
+    var op = openPitches(s);
+    if (op.length) rows += '<tr><td class="n">' + openN(s) + '</td><td>' + esc(op[0].pc || '') + '</td><td class="muted">In progress</td><td class="n">' + op.length + '</td><td></td><td></td><td></td><td></td></tr>';
+    var avg = evs.length ? (evs.reduce(function (a, b) { return a + b; }, 0) / evs.length).toFixed(1) : '–';
+    el.innerHTML = '<table><thead><tr><th class="n">#</th><th>Pitcher</th><th>Result</th><th class="n">Pitches</th><th class="n">Exit velo</th><th>QAB</th><th>85+ mph</th><th>6+ pitches</th></tr></thead><tbody>' + rows +
+      '</tbody><tfoot><tr><td colspan="4">Totals</td><td class="n">avg ' + avg + '</td><td>' + qab + '</td><td>' + e85 + '</td><td>' + s6 + '</td></tr></tfoot></table>';
+  }
+  function renderLog() {
+    var el = $('log'), s = view();
+    if (!s || !s.pitches.length) { el.innerHTML = '<li style="display:block" class="muted">No pitches yet for this hitter and session.</li>'; return; }
+    var html = '', start = Math.max(0, s.pitches.length - 12);
+    for (var k = s.pitches.length - 1; k >= start; k--) {
+      var p = s.pitches[k];
+      html += '<li><span class="no">#' + (k + 1) + '</span><span class="no">' + (p.pa ? 'AB ' + p.pa + '.' + p.i : '') + '</span><span><b>' + typeShort(p.t) + '</b> · ' + RES[p.res].l + ' <span class="muted">· ' + colTxt(p.c, 1) + ', row ' + p.r + ' · ' + TIERN[p.k] + (typeof p.ev === 'number' ? ' · ' + p.ev + ' mph' : '') + '</span></span><span class="g r-' + RES[p.res].cls.slice(2) + '">' + RES[p.res].g + '</span></li>';
+    }
+    el.innerHTML = html;
+  }
+  function renderBanner() {
+    var b = $('banner');
+    if (demoOn) { b.hidden = false; b.innerHTML = '<span>These are example pitches so you can see how it works. They are not saved.</span><button class="btn" id="startBtn" type="button">Start charting</button>'; }
+    else { b.hidden = true; b.innerHTML = ''; }
+  }
+  function renderHitters() {
+    var seen = {}, dl = $('hitters'); dl.innerHTML = '';
+    Object.keys(S).forEach(function (id) { var h = S[id].hitter; if (h && !seen[h.toLowerCase()]) { seen[h.toLowerCase()] = 1; var o = document.createElement('option'); o.value = h; dl.appendChild(o); } });
+  }
+  function renderScope() {
+    var bs = $('scope').querySelectorAll('button');
+    for (var k = 0; k < bs.length; k++) bs[k].setAttribute('aria-pressed', bs[k].getAttribute('data-s') === cur.scope ? 'true' : 'false');
+  }
+  function renderAll() { renderBanner(); renderStrip(); renderChart(); renderResults(); renderLast(); renderStats(); renderAtBats(); renderLog(); renderScope(); }
+
+  /* ---------- actions ---------- */
+  function leaveDemo(clear) {
+    if (!demoOn) return;
+    demoOn = false; demo = null;
+    if (clear) { cur.hitter = ''; $('hitter').value = ''; }
+    $('hitter').focus && clear && $('hitter').focus();
+    pend = null; savePrefs();
+  }
+  function logResult(res) {
+    if (!pend || !cur.hitter.trim()) return;
+    var sess = curSession(true), before = sess.pas.length;
+    var p = addPitch(sess, pend, cur.type, res, cur.pitcher.trim());
+    lastMsg = sess.pas.length > before && sess.pas[sess.pas.length - 1].n === p.pa ? 'At-bat ' + p.pa + ' ended: ' + sess.pas[sess.pas.length - 1].res + '.' : '';
+    pend = null; persist(sess); renderHitters(); renderAll();
+  }
+  function syncFromSession() {
+    var s = curSession(false);
+    if (s) { cur.ab = s.ab; $('ab').checked = s.ab; }
+  }
+  function toView(cx, cy) {
+    var svg = $('zone'), m = svg.getScreenCTM();
+    if (!m) return null;
+    var pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy;
+    var q = pt.matrixTransform(m.inverse());
+    if (q.x < 0 || q.y < 0 || q.x > VBW || q.y > MY + H) return null;
+    return q;
+  }
+  function rowArrays(list) {
+    var out = [];
+    list.forEach(function (s) {
+      s.pitches.forEach(function (p) {
+        var a = s.pas.filter(function (x) { return x.n === p.pa; })[0];
+        out.push([s.date, s.hitter, s.setting, p.pc || '', p.pa || '', p.i || '', p.t, typeShort(p.t), p.x, p.y, p.c, p.r, TIERN[p.k], RES[p.res].l, typeof p.ev === 'number' ? p.ev : '', a ? a.res : '', a ? (a.qab ? 'Y' : 'N') : '']);
+      });
+    });
+    return out;
+  }
+  function rowsFor(list) {
+    var lines = [];
+    list.forEach(function (s) {
+      s.pitches.forEach(function (p) {
+        var a = s.pas.filter(function (x) { return x.n === p.pa; })[0];
+        lines.push([s.date, s.hitter, s.setting, p.pc || '', p.pa || '', p.i || '', p.t, typeShort(p.t), p.x, p.y, p.c, p.r, TIERN[p.k], RES[p.res].l, typeof p.ev === 'number' ? p.ev : '', a ? a.res : '', a ? (a.qab ? 'Y' : 'N') : '']
+          .map(function (v) { return String(v).replace(/[\t\r\n]+/g, ' '); }).join('\t'));
+      });
+    });
+    return lines;
+  }
+  function copyRows(list) {
+    var lines = rowsFor(list), ta = $('tsv'), st = $('status');
+    if (!lines.length) { setStatus('No saved pitches to copy yet.'); return; }
+    var text = HEAD.join('\t') + '\n' + lines.join('\n');
+    ta.value = text; ta.hidden = false;
+    function fb() { ta.focus(); ta.select(); setStatus('Select the text and copy it (' + lines.length + ' rows).'); }
+    try { navigator.clipboard.writeText(text).then(function () { setStatus('Copied ' + lines.length + ' rows with a header row.'); }, fb); } catch (e) { fb(); }
+  }
+
+  /* ---------- example data ---------- */
+  function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function makeDemo() {
+    var rnd = mulberry(11), s = { id: 'demo', hitter: 'Example Hitter', date: today(), setting: 'Live BP', ab: true, pitches: [], pas: [] };
+    function gauss() { return (rnd() + rnd() + rnd() - 1.5) / 1.5; }
+    for (var k = 0; k < 11; k++) {
+      var guard = 0;
+      while (s.pas.length <= k && guard++ < 16) {
+        var x = Math.min(112, Math.max(-12, 50 + gauss() * 52)), y = Math.min(99, Math.max(1, 52 + gauss() * 44));
+        var loc = locate(MX + x / 100 * W, MY + y / 100 * H), type = rnd() < .5 ? 1 : 1 + Math.floor(rnd() * 7), u = rnd(), res;
+        var inZ = loc.k === 'D' || loc.k === 'L', swingP = loc.k === 'D' ? .72 : loc.k === 'L' ? .5 : loc.k === 'N' ? .3 : .2;
+        if (u > swingP) res = (inZ ? rnd() < .75 : rnd() > .85) ? 'Strike' : 'Ball';
+        else {
+          var v = rnd(), hot = loc.c >= 3 && loc.c <= 5 && loc.r >= 3 && loc.r <= 4, hard = hot ? .38 : (loc.k === 'D' ? .16 : .06), miss = loc.k === 'D' ? .14 : (loc.k === 'L' ? .28 : .5);
+          res = v < hard ? 'Hard contact' : v < hard + miss ? 'Miss' : v < hard + miss + .26 ? 'Foul' : 'In play';
+        }
+        var p = addPitch(s, loc, type, res, 'Sample Pitcher');
+        if (CONTACT[res]) { p.ev = Math.round(res === 'Hard contact' ? 88 + rnd() * 10 : 62 + rnd() * 22); if (awaiting(s)) closePA(s, OUTCOMES[Math.floor(rnd() * OUTCOMES.length)]); }
+      }
+      if (s.pas.length <= k) closePA(s, 'Unfinished');
+    }
+    s.pas.forEach(function (a) { if (rnd() < .35) a.qab = true; });
+    return s;
+  }
+
+  /* ---------- wiring ---------- */
+  function wire() {
+    var svg = $('zone');
+    svg.setAttribute('viewBox', '0 0 ' + VBW + ' ' + VBH);
+    svg.style.width = 'min(100%, ' + r1(60 * VBW / VBH) + 'vh)';
+    STATIC = buildStatic();
+    svg.addEventListener('click', function (e) {
+      var q = toView(e.clientX, e.clientY);
+      if (!q) return;
+      if (demoOn) { leaveDemo(true); renderAll(); return; }
+      pend = locate(q.x, q.y); renderChart(); renderResults();
+    });
+    svg.addEventListener('keydown', function (e) {
+      var d = { ArrowLeft: [-8, 0], ArrowRight: [8, 0], ArrowUp: [0, -8], ArrowDown: [0, 8] }[e.key];
+      if (!d) return;
+      e.preventDefault();
+      if (demoOn) { leaveDemo(true); renderAll(); return; }
+      var vx = pend ? MX + pend.x / 100 * W : MX + W / 2, vy = pend ? MY + pend.y / 100 * H : MY + H / 2;
+      pend = locate(vx + d[0], vy + d[1]); renderChart(); renderResults();
+    });
+    $('hitter').addEventListener('input', function () { if (demoOn) leaveDemo(false); cur.hitter = this.value; pend = null; lastMsg = ''; savePrefs(); syncFromSession(); renderAll(); });
+    $('setting').addEventListener('change', function () {
+      if (demoOn) leaveDemo(false);
+      cur.setting = this.value; pend = null; lastMsg = '';
+      if (!curSession(false)) { cur.ab = cur.setting !== 'Drill'; $('ab').checked = cur.ab; } else syncFromSession();
+      savePrefs(); renderAll();
+    });
+    $('date').addEventListener('change', function () { if (demoOn) leaveDemo(false); cur.date = this.value || today(); pend = null; lastMsg = ''; syncFromSession(); renderAll(); });
+    $('pitcher').addEventListener('input', function () { cur.pitcher = this.value; savePrefs(); });
+    $('ab').addEventListener('change', function () {
+      cur.ab = this.checked; savePrefs();
+      var s = demoOn ? null : curSession(false);
+      if (s) { s.ab = cur.ab; persist(s); }
+      renderAll();
+    });
+    $('scope').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; cur.scope = b.getAttribute('data-s'); savePrefs(); renderChart(); renderStats(); renderScope(); });
+    $('banner').addEventListener('click', function (e) { if (e.target.id === 'startBtn') { leaveDemo(true); renderAll(); } });
+    $('strip').addEventListener('click', function (e) {
+      var s = view(); if (!s) return;
+      var o = e.target.closest('[data-o]');
+      if (o) {
+        var note = $('pnote') ? $('pnote').value.trim() : '';
+        closePA(s, OUTCOMES[+o.getAttribute('data-o')], note); lastMsg = ''; persist(s); renderAll(); return;
+      }
+      if (e.target.id === 'endAB') { closePA(s, 'Unfinished'); lastMsg = ''; persist(s); renderAll(); }
+    });
+    $('last').addEventListener('click', function (e) {
+      if (e.target.id !== 'undo') return;
+      var s = view(); if (!s) return;
+      undoPitch(s); lastMsg = ''; pend = null; persist(s); renderAll();
+    });
+    $('last').addEventListener('change', function (e) {
+      if (e.target.id !== 'ev') return;
+      var s = view(); if (!s || !s.pitches.length) return;
+      var v = parseFloat(e.target.value), p = s.pitches[s.pitches.length - 1];
+      if (isNaN(v)) delete p.ev; else if (v >= 30 && v <= 125) p.ev = Math.round(v * 10) / 10; else { setStatus('Exit velo should be between 30 and 125 mph.', true); return; }
+      persist(s); renderStats(); renderAtBats(); renderLog();
+    });
+    $('abs').addEventListener('change', function (e) {
+      var n = e.target.getAttribute && e.target.getAttribute('data-q');
+      if (!n) return;
+      var s = view(); if (!s) return;
+      s.pas.forEach(function (a) { if (a.n === +n) a.qab = e.target.checked; });
+      persist(s); renderAtBats();
+    });
+    $('copyS').addEventListener('click', function () { var s = view(); copyRows(s && !demoOn ? [s] : []); });
+    $('copyA').addEventListener('click', function () { copyRows(Object.keys(S).sort().map(function (k) { return S[k]; })); });
+    var armed = false;
+    $('delS').addEventListener('click', function () {
+      var b = this, s = demoOn ? null : curSession(false);
+      if (!s) { setStatus('There is no saved session for this hitter, setting and date.'); return; }
+      if (!armed) { armed = true; b.textContent = 'Tap again to delete'; setTimeout(function () { armed = false; b.textContent = 'Delete this session'; }, 3500); return; }
+      armed = false; b.textContent = 'Delete this session';
+      delete S[s.id]; delete dirty[s.id];
+      if (DB) DB.doc('sessions/' + s.id).delete().then(function () { setStatus('Session deleted.'); }, function (er) { setStatus('Could not delete (' + ((er && er.code) || 'error') + ').', true); });
+      else { saveLocal(); queueSync(s.id, 'del'); }
+      pend = null; $('tsv').hidden = true; renderHitters(); renderAll();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+      var n = parseInt(e.key, 10);
+      if (n >= 1 && n <= 7) { cur.type = n; savePrefs(); renderTypes(); }
+    });
+  }
+
+  function finishLoad() {
+    var ids = Object.keys(S);
+    if (!ids.length) { demo = makeDemo(); demoOn = true; cur.hitter = 'Example Hitter'; $('hitter').value = cur.hitter; }
+    else if (!cur.hitter.trim()) {
+      ids.sort(function (a, b) { return S[a].date < S[b].date ? 1 : -1; });
+      cur.hitter = S[ids[0]].hitter; $('hitter').value = cur.hitter;
+    }
+    renderHitters();
+    if (!demoOn) syncFromSession();
+    setStatus(DB ? (ids.length ? ids.length + ' saved session' + (ids.length === 1 ? '' : 's') + ' loaded.' : 'Ready. Pitches save automatically.') : 'Saving on this device only.');
+    renderAll();
+  }
+  function initDb() {
+    var u = (window.claude && window.claude.use) ? window.claude.use('db') : Promise.resolve(null);
+    u.then(function (db) {
+      if (!db) { DB = null; loadLocal(); finishLoad(); return; }
+      DB = db;
+      return db.collection('sessions').limit(1000).get().then(function (snap) {
+        snap.docs.forEach(function (d) { var v = d.data(); if (v) S[d.id] = norm(v, d.id); });
+        finishLoad();
+      }, function (e) {
+        DB = null; loadLocal(); finishLoad();
+        setStatus('Could not reach saved data (' + ((e && e.code) || 'error') + '). Working on this device only.', true);
+      });
+    }, function () { DB = null; loadLocal(); finishLoad(); });
+  }
+
+  /* ---------- team Google Sheet sync (Apps Script web app) ---------- */
+  var SYNC = { url: '', key: '' }, pending = {}, syncBusy = false, syncTimer = 0;
+  function loadSync() {
+    try { var o = JSON.parse(localStorage.getItem('ptc-sync') || '{}'); SYNC.url = o.url || ''; SYNC.key = o.key || ''; } catch (e) {}
+    try { pending = JSON.parse(localStorage.getItem('ptc-pending') || '{}') || {}; } catch (e) { pending = {}; }
+    try {
+      var q = new URLSearchParams(location.search);
+      if (q.get('u')) {
+        SYNC.url = q.get('u'); SYNC.key = q.get('k') || SYNC.key;
+        localStorage.setItem('ptc-sync', JSON.stringify(SYNC));
+        history.replaceState(null, '', location.pathname);
+      }
+    } catch (e) {}
+  }
+  function savePending() { try { localStorage.setItem('ptc-pending', JSON.stringify(pending)); } catch (e) {} }
+  function syncMsg(t, err) { var el = $('syncMsg'); if (el) { el.textContent = t; el.style.color = err ? 'var(--warn)' : ''; } }
+  function pendN() { return Object.keys(pending).length; }
+  function queueSync(id, op) {
+    if (!SYNC.url || demoOn) return;
+    pending[id] = op; savePending();
+    clearTimeout(syncTimer); syncTimer = setTimeout(flushSync, 1200);
+  }
+  function post(payload) {
+    payload.key = SYNC.key;
+    return fetch(SYNC.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (!j || !j.ok) throw new Error((j && j.error) || 'rejected'); return j; });
+  }
+  function flushSync() {
+    if (!SYNC.url || syncBusy) return;
+    var ids = Object.keys(pending);
+    if (!ids.length) { syncMsg('Connected. Everything is sent.'); return; }
+    syncBusy = true;
+    var id = ids[0], op = pending[id], job;
+    if (op === 'del' || !S[id]) job = post({ op: 'del', id: id });
+    else job = post({ op: 'put', id: id, rows: rowArrays([S[id]]) });
+    job.then(function () {
+      if (pending[id] === op) delete pending[id];
+      savePending(); syncBusy = false; syncMsg(pendN() ? 'Sending… ' + pendN() + ' left.' : 'Connected. Everything is sent.'); flushSync();
+    }, function (e) {
+      syncBusy = false; syncMsg('Could not send (' + (e && e.message ? e.message : 'offline') + '). ' + pendN() + ' waiting; will retry.', true);
+      clearTimeout(syncTimer); syncTimer = setTimeout(flushSync, 20000);
+    });
+  }
+  function wireSync() {
+    $('syncUrl').value = SYNC.url; $('syncKey').value = SYNC.key;
+    syncMsg(SYNC.url ? (pendN() ? pendN() + ' session' + (pendN() === 1 ? '' : 's') + ' waiting to send.' : 'Connected.') : 'Not connected. Pitches save on this device only.');
+    $('syncSave').addEventListener('click', function () {
+      SYNC.url = $('syncUrl').value.trim(); SYNC.key = $('syncKey').value;
+      if (!SYNC.url) { syncMsg('Paste the Web app URL first.', true); return; }
+      syncMsg('Testing…');
+      fetch(SYNC.url + (SYNC.url.indexOf('?') < 0 ? '?' : '&') + 'key=' + encodeURIComponent(SYNC.key)).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || !j.ok) throw new Error((j && j.error) || 'rejected');
+        try { localStorage.setItem('ptc-sync', JSON.stringify(SYNC)); } catch (e) {}
+        syncMsg('Connected. The sheet has ' + j.rows + ' pitch rows.'); flushSync();
+      }).catch(function (e) { syncMsg('Could not connect (' + (e && e.message ? e.message : 'check the link') + ').', true); });
+    });
+    $('syncAll').addEventListener('click', function () {
+      if (!SYNC.url) { syncMsg('Connect first.', true); return; }
+      Object.keys(S).forEach(function (id) { pending[id] = 'put'; }); savePending(); flushSync();
+    });
+    $('syncOff').addEventListener('click', function () {
+      SYNC = { url: '', key: '' }; pending = {}; savePending();
+      try { localStorage.removeItem('ptc-sync'); } catch (e) {}
+      $('syncUrl').value = ''; $('syncKey').value = ''; syncMsg('Disconnected. Pitches save on this device only.');
+    });
+    window.addEventListener('online', flushSync);
+    if (SYNC.url) setTimeout(flushSync, 1500);
+  }
+
+  loadPrefs();
+  loadSync();
+  cur.date = today();
+  $('date').value = cur.date; $('hitter').value = cur.hitter; $('pitcher').value = cur.pitcher; $('setting').value = cur.setting; $('ab').checked = cur.ab;
+  wire(); wireSync(); renderTypes(); renderAll();
+  setStatus('Loading saved pitches…');
+  initDb();
+})();
+</script>
+</body>
+</html>
